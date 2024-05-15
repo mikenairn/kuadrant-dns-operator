@@ -40,6 +40,7 @@ jobs:
         with:
           image: ${{ env.OPERATOR_NAME }}
           tags: ${{ env.IMG_TAGS }}
+          platforms: linux/amd64,linux/arm64
           dockerfiles: |
             ./Dockerfile
 
@@ -80,6 +81,7 @@ jobs:
         with:
           image: ${{ env.OPERATOR_NAME }}-bundle
           tags: ${{ needs.build.outputs.build-tags }}
+          platforms: linux/amd64,linux/arm64
           dockerfiles: |
             ./bundle.Dockerfile
 
@@ -117,6 +119,7 @@ jobs:
         with:
           image: ${{ env.OPERATOR_NAME }}-catalog
           tags: ${{ needs.build.outputs.build-tags }}
+          platforms: linux/amd64,linux/arm64
           context: ./tmp/catalog
           dockerfiles: |
             ./tmp/catalog/index.Dockerfile
