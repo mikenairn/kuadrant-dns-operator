@@ -112,6 +112,79 @@ var _ = Describe("DNSRecordReconciler", func() {
 		}
 	})
 
+	FIt("handles records with same owner and similar root hosts", func(ctx SpecContext) {
+		dnsRecord = &v1alpha1.DNSRecord{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar.example.com",
+				Namespace: testNamespace,
+			},
+			Spec: v1alpha1.DNSRecordSpec{
+				OwnerID:  "owner1",
+				RootHost: "bar.example.com",
+				ManagedZoneRef: &v1alpha1.ManagedZoneReference{
+					Name: managedZone.Name,
+				},
+				Endpoints:   getTestEndpoints("bar.example.com", "127.0.0.1"),
+				HealthCheck: nil,
+			},
+		}
+		Expect(k8sClient.Create(ctx, dnsRecord)).To(Succeed())
+		Eventually(func(g Gomega) {
+			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(dnsRecord), dnsRecord)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(dnsRecord.Status.Conditions).To(
+				ContainElement(MatchFields(IgnoreExtras, Fields{
+					"Type":               Equal(string(v1alpha1.ConditionTypeReady)),
+					"Status":             Equal(metav1.ConditionTrue),
+					"Reason":             Equal("ProviderSuccess"),
+					"Message":            Equal("Provider ensured the dns record"),
+					"ObservedGeneration": Equal(dnsRecord.Generation),
+				})),
+			)
+		}, TestTimeoutMedium, time.Second).Should(Succeed())
+
+		dnsRecord2 = &v1alpha1.DNSRecord{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo.bar.example.com",
+				Namespace: testNamespace,
+			},
+			Spec: v1alpha1.DNSRecordSpec{
+				OwnerID: "owner1",
+				//OwnerID:  "owner2", // Changing owner will make it work
+				RootHost: "foo.bar.example.com",
+				ManagedZoneRef: &v1alpha1.ManagedZoneReference{
+					Name: managedZone.Name,
+				},
+				Endpoints:   getTestEndpoints("foo.bar.example.com", "127.0.0.2"),
+				HealthCheck: nil,
+			},
+		}
+		Expect(k8sClient.Create(ctx, dnsRecord2)).To(Succeed())
+		Eventually(func(g Gomega) {
+			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(dnsRecord2), dnsRecord2)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(dnsRecord2.Status.Conditions).To(
+				ContainElement(MatchFields(IgnoreExtras, Fields{
+					"Type":               Equal(string(v1alpha1.ConditionTypeReady)),
+					"Status":             Equal(metav1.ConditionTrue),
+					"Reason":             Equal("ProviderSuccess"),
+					"Message":            Equal("Provider ensured the dns record"),
+					"ObservedGeneration": Equal(dnsRecord2.Generation),
+				})),
+			)
+		}, TestTimeoutMedium, time.Second).Should(Succeed())
+
+		Consistently(func(g Gomega) {
+			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(dnsRecord), dnsRecord)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(dnsRecord.Status.WriteCounter).To(Not(BeNumerically(">", int64(1))))
+
+			err = k8sClient.Get(ctx, client.ObjectKeyFromObject(dnsRecord2), dnsRecord2)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(dnsRecord2.Status.WriteCounter).To(Not(BeNumerically(">", int64(1))))
+		}, TestTimeoutLong, time.Second).Should(Succeed())
+	})
+
 	It("dns records are reconciled once zone is fixed", func(ctx SpecContext) {
 		dnsRecord = &v1alpha1.DNSRecord{
 			ObjectMeta: metav1.ObjectMeta{
