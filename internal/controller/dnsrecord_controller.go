@@ -466,6 +466,8 @@ func (r *DNSRecordReconciler) applyChanges(ctx context.Context, dnsRecord *v1alp
 
 	plan = plan.Calculate()
 
+	logger.Info(fmt.Sprintf("All record owners: %v", plan.Owners))
+
 	if err = plan.Error(); err != nil {
 		return false, err
 	}

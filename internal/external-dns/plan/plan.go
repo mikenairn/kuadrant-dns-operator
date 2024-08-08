@@ -63,6 +63,10 @@ type Plan struct {
 	// Errors list of errors describing issues that can't be resolved by the plan.
 	// Populated after calling Calculate()
 	Errors []error
+	// Owners list of owners ids contributing to this record set.
+	// Populated after calling Calculate()
+	Owners []string
+
 	// RootHost the host dns name being managed by the set of records in the plan.
 	RootHost *string
 
@@ -359,11 +363,14 @@ func (p *Plan) Calculate() *Plan {
 		//changes.UpdateNew = endpoint.FilterEndpointsByOwnerID(p.OwnerID, changes.UpdateNew)
 	}
 
+	p.logger.Info("Owners", "allOwners", managedChanges.dnsNameOwners, "rootHost", p.RootHost)
+
 	plan := &Plan{
 		Current:        p.Current,
 		Desired:        p.Desired,
 		Changes:        changes,
 		Errors:         errs,
+		Owners:         managedChanges.dnsNameOwners[normalizeDNSName(*p.RootHost)],
 		ManagedRecords: []string{endpoint.RecordTypeA, endpoint.RecordTypeAAAA, endpoint.RecordTypeCNAME},
 	}
 
