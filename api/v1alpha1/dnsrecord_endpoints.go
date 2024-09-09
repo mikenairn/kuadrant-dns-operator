@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/kuadrant/dns-operator/internal/common/hash"
 )
+
+type RoutingStrategy string
 
 const (
 	SimpleRoutingStrategy       RoutingStrategy = "simple"
@@ -33,15 +36,47 @@ var (
 	ErrUnknownRoutingStrategy = fmt.Errorf("unknown routing strategy")
 )
 
-// RoutingStrategy specifies a strategy to be used: simple or load-balanced
-// +kubebuilder:validation:Enum=simple;loadbalanced
-// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="RoutingStrategy is immutable"
-// +kubebuilder:default=loadbalanced
-type RoutingStrategy string
+type LoadBalancingSpec struct {
+	Weighted LoadBalancingWeighted `json:"weighted"`
+
+	Geo LoadBalancingGeo `json:"geo"`
+}
+
+// +kubebuilder:validation:Minimum=0
+type Weight int
 
 type CustomWeight struct {
-	Weight   int
-	Selector v1.LabelSelector
+	// Label selector to match resource storing custom weight attribute values e.g. kuadrant.io/lb-attribute-custom-weight: AWS.
+	Selector *metav1.LabelSelector `json:"selector"`
+
+	// The weight value to apply when the selector matches.
+	Weight Weight `json:"weight"`
+}
+
+type LoadBalancingWeighted struct {
+	// defaultWeight is the record weight to use when no other can be determined for a dns target cluster.
+	//
+	// The maximum value accepted is determined by the target dns provider, please refer to the appropriate docs below.
+	//
+	// Route53: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-weighted.html
+	DefaultWeight Weight `json:"defaultWeight"`
+
+	// custom list of custom weight selectors.
+	// +optional
+	Custom []*CustomWeight `json:"custom,omitempty"`
+}
+
+type GeoCode string
+
+type LoadBalancingGeo struct {
+	// defaultGeo is the country/continent/region code to use when no other can be determined for a dns target cluster.
+	//
+	// The values accepted are determined by the target dns provider, please refer to the appropriate docs below.
+	//
+	// Route53: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-values-geo.html
+	// Google: https://cloud.google.com/compute/docs/regions-zones
+	// +kubebuilder:validation:MinLength=2
+	DefaultGeo string `json:"defaultGeo"`
 }
 
 // Routing holds all necessary information to generate endpoints
@@ -273,12 +308,12 @@ func targetsFromAddresses(addresses map[string]string) ([]string, []string) {
 func (r *Routing) getWeight(objectLabels map[string]string) int {
 	weight := r.DefaultWeight
 	for _, customWeight := range r.CustomWeights {
-		selector, err := v1.LabelSelectorAsSelector(&customWeight.Selector)
+		selector, err := v1.LabelSelectorAsSelector(customWeight.Selector)
 		if err != nil {
 			return weight
 		}
 		if selector.Matches(labels.Set(objectLabels)) {
-			weight = customWeight.Weight
+			weight = int(customWeight.Weight)
 			break
 		}
 	}
