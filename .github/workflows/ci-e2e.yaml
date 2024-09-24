@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "release-*"
+      - "ci_*"
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
     paths-ignore:
@@ -77,3 +78,13 @@ jobs:
         run: |
           kubectl get deployments -A
           kubectl logs --all-containers --ignore-errors deployments/dns-operator-controller-manager -n dns-operator-system
+      - name: Dump Controller metrics
+        if: ${{ success() }}
+        run: |
+          kubectl run -q curl --image=curlimages/curl --rm -it --restart=Never --namespace dns-operator-system -- curl -XGET http://dns-operator-controller-manager-metrics-service:8080/metrics > metrics.txt
+          cat metrics.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metrics
+          path: metrics.txt
+          if-no-files-found: warn
