@@ -70,10 +70,10 @@ jobs:
           make test-e2e
       - if: github.event_name == 'pull_request_target'
         run:
-          echo "AZURE_GINKGO_FLAGS='-v -p --label-filter="!provider_errors && !multi_record && !health_checks"'" >> $GITHUB_ENV
+          echo "AZURE_GINKGO_FLAGS='-v --label-filter="!provider_errors && !multi_record && !health_checks"'" >> $GITHUB_ENV
       - if: github.event_name != 'pull_request_target'
         run:
-          echo "AZURE_GINKGO_FLAGS='-v -p'" >> $GITHUB_ENV
+          echo "AZURE_GINKGO_FLAGS='-v'" >> $GITHUB_ENV
       - name: Run suite Azure
         run: |
           export TEST_DNS_PROVIDER_SECRET_NAME=dns-provider-credentials-azure
