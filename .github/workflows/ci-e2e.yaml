@@ -72,6 +72,7 @@ jobs:
           export TEST_DNS_PROVIDER_SECRET_NAME=dns-provider-credentials-azure
           export TEST_DNS_ZONE_DOMAIN_NAME=e2e.azure.hcpapps.net
           export TEST_DNS_NAMESPACES=${{ env.TEST_NAMESPACE }}
+          export GINKGO_FLAGS="--dry-run"
           make test-e2e
       - name: Dump Controller logs
         if: ${{ failure() }}
