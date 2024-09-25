@@ -5,7 +5,6 @@ on:
     branches:
       - main
       - "release-*"
-      - "ci_*"
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
     paths-ignore:
@@ -23,11 +22,21 @@ on:
       - 'samples/**'
       - 'LICENSE'
   workflow_dispatch:
+    inputs:
+      ginkgoParallel:
+        description: Run tests in parallel
+        default: false
+        type: boolean
+      ginkgoFlags:
+        description: Flags to pass directly to the ginkgo command
+        default: "-v --dry-run"
+        type: string
   merge_group:
 
 env:
   TEST_NAMESPACE: e2e-test
-  GINKGO_PARALLEL: true
+  GINKGO_PARALLEL: ${{ inputs.ginkgoParallel }}
+  GINKGO_FLAGS:  ${{ inputs.ginkgoFlags }}
 
 jobs:
   e2e_test_suite:
@@ -68,12 +77,12 @@ jobs:
           export TEST_DNS_ZONE_DOMAIN_NAME=e2e.google.hcpapps.net
           export TEST_DNS_NAMESPACES=${{ env.TEST_NAMESPACE }}
           make test-e2e
-      - if: github.event_name == 'pull_request_target'
+      - if: github.event_name == 'push'
         run:
-          echo "AZURE_GINKGO_FLAGS='-v --label-filter="!provider_errors && !multi_record && !health_checks"'" >> $GITHUB_ENV
-      - if: github.event_name != 'pull_request_target'
+          echo "AZURE_GINKGO_FLAGS='-v --dry-run'" >> $GITHUB_ENV
+      - if: github.event_name != 'push'
         run:
-          echo "AZURE_GINKGO_FLAGS='-v'" >> $GITHUB_ENV
+          echo "AZURE_GINKGO_FLAGS='-v --label-filter="happy" --dry-run'" >> $GITHUB_ENV
       - name: Run suite Azure
         run: |
           export TEST_DNS_PROVIDER_SECRET_NAME=dns-provider-credentials-azure
